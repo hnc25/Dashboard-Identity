@@ -1,16 +1,14 @@
-# Dashboard-Identity
 import dash
 from dash import dcc, html, Input, Output
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly.io as pio  # Import for saving HTML files
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
 # ----------------------------
-# Data Preparation Function
+# Data Preparation
 # ----------------------------
 def get_data(time_range):
     if time_range == "1 Month":
@@ -45,11 +43,18 @@ def get_data(time_range):
         }
 
 # ----------------------------
-# Layout
+# Layout of the Dashboard
 # ----------------------------
 app.layout = html.Div([
+    # Title and Description
     html.H1("Identity Reporting", style={"textAlign": "center", "marginBottom": "20px"}),
+    html.P(
+        "The Identity Summary is a report that shows the uniqueness of the profiles managed within the Identity Essentials product. "
+        "At a glance, a client can understand how many unique people they can talk to and how many are matched to Epsilon's CORE ID.",
+        style={"textAlign": "center", "fontWeight": "bold"}
+    ),
 
+    # Time Range Selector
     html.Div([
         html.Label("Time Range:", style={"fontWeight": "bold", "textAlign": "center"}),
         dcc.Dropdown(
@@ -64,19 +69,31 @@ app.layout = html.Div([
         )
     ], style={"textAlign": "center", "marginBottom": "20px"}),
 
+    # Total Profiles
+    html.H2("Total Profiles", style={"marginTop": "30px"}),
+    html.P("How many unique individuals and households exist in my universe?", 
+           style={"fontWeight": "bold", "marginLeft": "10px"}),
     html.Div(id="total-profiles-tiles", style={"display": "flex", "justifyContent": "space-around"}),
 
+    # Channel Distribution
+    html.H2("Channel Distribution", style={"marginTop": "30px"}),
+    html.P("How much unique reach do I have across my owned marketing channels?", 
+           style={"fontWeight": "bold", "marginLeft": "10px"}),
     dcc.Graph(id="total-vs-unique-identifiers-graph"),
     dcc.Graph(id="unique-channel-reach-graph"),
 
+    # CoreID Match Reach
+    html.H2("CoreID Match Reach", style={"marginTop": "30px"}),
+    html.P("How much unique reach do I have in Epsilon's digital channels?", 
+           style={"fontWeight": "bold", "marginLeft": "10px"}),
     html.Div([
         dcc.Graph(id="coreid-match-gauge", style={"width": "45%", "display": "inline-block"}),
         dcc.Graph(id="reach-rate-gauge", style={"width": "45%", "display": "inline-block"})
-    ], style={"textAlign": "center"})
+    ], style={"textAlign": "center"}),
 ])
 
 # ----------------------------
-# Callbacks for Graph Updates
+# Callbacks for Dynamic Updates
 # ----------------------------
 @app.callback(
     [
@@ -105,6 +122,7 @@ def update_dashboard(time_range):
     totals = [data["channel_distribution"][c][0] for c in channels]
     unique_identifiers = [data["channel_distribution"][c][1] for c in channels]
 
+    # Prepare data for legend
     channel_data = pd.DataFrame({
         "Channel": channels * 2,
         "Count": totals + unique_identifiers,
@@ -116,26 +134,22 @@ def update_dashboard(time_range):
         x="Channel", 
         y="Count", 
         color="Type", 
+        title="Total Identifiers vs Unique Identifiers",
+        text="Count", 
         barmode="group", 
-        text="Count",
-        title="Total vs Unique Identifiers"
+        labels={"Type": "Legend", "Count": "Identifiers"}
     )
     total_vs_unique_fig.update_traces(texttemplate='%{text:,}', textposition='outside')
-    pio.write_html(total_vs_unique_fig, "total_vs_unique_identifiers.html")  # Save HTML
+    total_vs_unique_fig.update_layout(legend_title_text="Legend")
 
-    # Unique Channel Reach
+    # Channel Distribution - Unique Channel Reach
     reach_percentages = [data["channel_distribution"][c][2] for c in channels]
     unique_channel_reach_fig = px.bar(
-        x=channels, 
-        y=reach_percentages, 
-        text=[f"{p}%" for p in reach_percentages],
-        labels={"x": "Channel", "y": "Reach (%)"},
-        title="Unique Channel Reach"
+        x=channels, y=reach_percentages, text=[f"{p}%" for p in reach_percentages],
+        title="Unique Channel Reach (%)", labels={"x": "Channel", "y": "Reach (%)"}
     )
-    unique_channel_reach_fig.update_traces(textposition='outside')
-    pio.write_html(unique_channel_reach_fig, "unique_channel_reach.html")  # Save HTML
 
-    # CoreID Match Gauge
+    # CoreID Match Reach
     coreid_match_fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=round(data["coreid_reach"]["Matched CoreID"] / data["coreid_reach"]["Total Profiles"] * 100),
@@ -143,9 +157,7 @@ def update_dashboard(time_range):
         title={"text": "CoreID Match Rate (%)"},
         gauge={"axis": {"range": [0, 100]}}
     ))
-    pio.write_html(coreid_match_fig, "coreid_match_rate.html")  # Save HTML
 
-    # Reach Rate Gauge
     reach_rate_fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=round(data["coreid_reach"]["Actual Reach"] / data["coreid_reach"]["Matched CoreID"] * 100),
@@ -153,7 +165,6 @@ def update_dashboard(time_range):
         title={"text": "Reach Rate (%)"},
         gauge={"axis": {"range": [0, 100]}}
     ))
-    pio.write_html(reach_rate_fig, "reach_rate.html")  # Save HTML
 
     return total_profiles_tiles, total_vs_unique_fig, unique_channel_reach_fig, coreid_match_fig, reach_rate_fig
 
@@ -162,4 +173,3 @@ def update_dashboard(time_range):
 # ----------------------------
 if __name__ == '__main__':
     app.run_server(debug=True)
-
